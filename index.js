@@ -5,6 +5,7 @@ import fs from "fs";
 import "dotenv/config";
 import bodyParser from "body-parser";
 import axios from "axios";
+import moment from "moment";
 
 const app = express();
 const port = 80;
@@ -64,7 +65,7 @@ app.post("/parse", (req, res) => {
         );
       })
       .catch((e) => {
-        // console.log(e);
+        console.log(e);
         axios.post(
           `https://chatter.salebot.pro/api/${process.env.SALEBOT_API_KEY}/callback`,
           {
@@ -102,7 +103,7 @@ async function createGoogleSheet(username, items) {
   const response = await sheets.spreadsheets.create({
     resource: {
       properties: {
-        title: `Топ рилсов @${username}`,
+        title: `Топ рилсов @${username} ${getCurrentDateTime()}`,
       },
     },
   });
@@ -114,7 +115,7 @@ async function createGoogleSheet(username, items) {
   await drive.permissions.create({
     fileId: spreadsheetId,
     requestBody: {
-      role: "reader", // Только просмотр
+      role: "writer", // Только просмотр
       type: "anyone", // Для всех
     },
   });
@@ -122,7 +123,20 @@ async function createGoogleSheet(username, items) {
   const sheetUrl = response.data.spreadsheetUrl;
   console.log("Ссылка:", sheetUrl);
 
-  const labels = ["№", "Ссылка", "Просмотры", "Лайки", "Комментарии"];
+  const labels = [
+    "№",
+    "Ссылка",
+    "Дата публикации",
+    "Последний комментарий",
+    "Описание",
+    "Размер",
+    "Просмотры",
+    "Лайки",
+    "Репосты",
+    "Комментарии",
+    "Длительность",
+    "Музыка",
+  ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: spreadsheetId,
@@ -136,15 +150,90 @@ async function createGoogleSheet(username, items) {
           .map((el, i) => [
             i + 1,
             el.url,
+            formatDate(el.timestamp),
+            el.firstComment,
+            el.caption,
+            el.dimensionsWidth + "x" + el.dimensionsHeight,
             el.videoViewCount,
             el.likesCount,
+            "",
             el.commentsCount,
+            el.videoDuration,
+            el.musicInfo.artist_name + " - " + el.musicInfo.song_name,
           ]),
       ],
     },
   });
 
-  console.log("Данные добавлены!");
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: {
+              sheetId: 0,
+              startRowIndex: 0,
+              endRowIndex: 1,
+              startColumnIndex: 0,
+              endColumnIndex: labels.length,
+            },
+            cell: {
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 },
+              },
+            },
+            fields: "userEnteredFormat(textFormat,backgroundColor)",
+          },
+        },
+      ],
+    },
+  });
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          autoResizeDimensions: {
+            dimensions: {
+              sheetId: 0,
+              dimension: "COLUMNS", // Авторазмер колонок
+              startIndex: 0,
+              endIndex: null,
+            },
+          },
+        },
+        {
+          autoResizeDimensions: {
+            dimensions: {
+              sheetId: 0,
+              dimension: "ROWS", // Авторазмер строк
+              startIndex: 0,
+              endIndex: 100, // Можно поставить null для всех
+            },
+          },
+        },
+      ],
+    },
+  });
 
   return sheetUrl;
+}
+
+const getCurrentDateTime = () => {
+  return moment().format("YYYY-MM-DD HH:mm:ss"); // Форматируем дату и время
+};
+
+function formatDate(isoString) {
+  const date = new Date(isoString);
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // Месяцы начинаются с 0
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
