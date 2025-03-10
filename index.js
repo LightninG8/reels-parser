@@ -37,7 +37,7 @@ app.post("/parse", (req, res) => {
       resultsLimit: resultsLimit,
     };
 
-    console.log(`Старт парсинга REELS-видео с аккауна @${username} для ${clientId}`);
+    console.log(`Старт парсинга REELS-видео аккауна @${username} для ${clientId}`);
 
     client
       .actor("apify/instagram-reel-scraper")
