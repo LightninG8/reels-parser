@@ -30,14 +30,14 @@ app.post("/parse", (req, res) => {
   try {
     const username = req.body["username"];
     const resultsLimit = req.body["resultsLimit"] || 200;
-    const clientId = req.body["clientId"];
+    const clientId = +req.body["clientId"] || 676050413;
 
     const actorInput = {
       username: [username],
       resultsLimit: resultsLimit,
     };
 
-    console.log(`Старт парсинга REELS с аккауна @${username} для ${clientId}`);
+    console.log(`Старт парсинга REELS-видео с аккауна @${username} для ${clientId}`);
 
     client
       .actor("apify/instagram-reel-scraper")
